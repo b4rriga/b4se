@@ -19,6 +19,7 @@ bool b4_value_is_bool(const char *s);
 bool b4_value_is_int(const char *s);
 bool b4_value_is_float(const char *s);
 
+B4Values *b4_value_new(void);
 void b4_value_store(B4Values *vals, const char *key, const char *val);
 void b4_value_dump(B4Values *vals);
 void b4_value_free(B4Values *vals);
