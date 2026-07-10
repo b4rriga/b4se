@@ -44,7 +44,7 @@ bool b4_value_is_int(const char *s)
     return d == (double)(int64_t)d;
 }
 
-// TODO: support cientific notation
+// TODO: support scientific notation
 bool b4_value_is_float(const char *s)
 {
     if (!*s) return false;
@@ -144,16 +144,18 @@ static void store_float(struct value_entry *e, const char *val)
     e->f = strtod(val, NULL);
 }
 
+B4Values *b4_value_new(void)
+{
+    return calloc(1, sizeof(struct values));
+}
+
 void b4_value_store(B4Values *vals, const char *key, const char *val)
 {
     if (!vals || !key || !val) return;
 
     struct value_entry e = {0};
-    char *k = xstrdup(key);
-    char *v = xstrdup(val);
-
-    e.key = trim(k);
-    e.s = unquote(v);
+    e.key = trim(xstrdup(key));
+    e.s = unquote(val);
 
     if (b4_value_is_bool(e.s))  store_bool(&e, e.s);
     if (b4_value_is_int(e.s))   store_int(&e, e.s);
@@ -176,7 +178,8 @@ void b4_value_dump(B4Values *vals)
             fprintf(stderr, "├── as float  : %g", e.f);
 
             if (e.types & VALUE_INT)
-                fprintf(stderr, ".0");
+                fprintf(stderr, ".0"); // FIXME: sloppy attempt that fails miserably
+                                       //        when met with scientific notation
             fprintf(stderr, "\n");
         }
         fprintf(stderr, "└── as string : \"%s\"\n", e.s);
@@ -206,8 +209,16 @@ const char *b4_value_boolstr(bool expr)
 
 char *b4_value_get_str(B4Values *vals, const char *key, B4ValueStatus *err)
 {
-    struct value_entry *e = get_as(vals, key, VALUE_STR, err);
-    return e ? e->s : NULL;
+    struct value_entry *e = get(vals, key);
+
+    if (!e) {
+        if (err) *err = VALUE_NOT_FOUND;
+        return NULL;
+    }
+
+    if (err) *err = VALUE_OK;
+
+    return e->s;
 }
 
 bool b4_value_get_bool(B4Values *vals, const char *key, B4ValueStatus *err)
