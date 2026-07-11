@@ -4,9 +4,9 @@
 #include "../include/value.h"
 
 enum value_type {
-    VALUE_BOOL  = 1u << 0,
-    VALUE_INT   = 1u << 1,
-    VALUE_FLOAT = 1u << 2
+    B4VAL_BOOL  = 1u << 0,
+    B4VAL_INT   = 1u << 1,
+    B4VAL_FLOAT = 1u << 2
 };
 
 struct value_entry {

@@ -7,7 +7,7 @@
 
 #include "priv.h"
 
-bool b4_value_is_bool(const char *s)
+bool b4val_is_bool(const char *s)
 {
     if (stricmp(s, "true")  ||
         stricmp(s, "false") ||
@@ -25,7 +25,7 @@ bool b4_value_is_bool(const char *s)
 }
 
 // TODO: accept #AABBCC and #AABBCCDD as number for use as color
-bool b4_value_is_int(const char *s)
+bool b4val_is_int(const char *s)
 {
     if (!*s) return false;
     char *e;
@@ -45,7 +45,7 @@ bool b4_value_is_int(const char *s)
 }
 
 // TODO: support scientific notation
-bool b4_value_is_float(const char *s)
+bool b4val_is_float(const char *s)
 {
     if (!*s) return false;
     char *e;
@@ -55,7 +55,7 @@ bool b4_value_is_float(const char *s)
         if (*e == 0) return true;
     }
 
-    return b4_value_is_int(s);
+    return b4val_is_int(s);
 }
 
 static struct value_entry *get(B4Values *vals, const char *key)
@@ -72,16 +72,16 @@ static struct value_entry *get_as(B4Values *vals, const char *key, uint8_t type,
     struct value_entry *e = get(vals, key);
 
     if (!e) {
-        if (err) *err = VALUE_NOT_FOUND;
+        if (err) *err = B4VAL_NOT_FOUND;
         return NULL;
     }
 
     if (!(e->types & type)) {
-        if (err) *err = VALUE_BAD_CONVERSION;
+        if (err) *err = B4VAL_BAD_CONVERSION;
         return NULL;
     }
 
-    if (err) *err = VALUE_OK;
+    if (err) *err = B4VAL_OK;
 
     return e;
 }
@@ -108,7 +108,7 @@ static void push(B4Values *vals, struct value_entry e)
 
 static void store_bool(struct value_entry *e, const char *val)
 {
-    e->types |= VALUE_BOOL;
+    e->types |= B4VAL_BOOL;
 
     if (stricmp(val, "true") ||
         stricmp(val, "on")   ||
@@ -129,7 +129,7 @@ static void store_bool(struct value_entry *e, const char *val)
 
 static void store_int(struct value_entry *e, const char *val)
 {
-    e->types |= VALUE_INT;
+    e->types |= B4VAL_INT;
 
     if (val[0] == '0' && (val[1] == 'b' || val[1] == 'B'))
         e->i = strtol(val + 2, NULL, 2);
@@ -139,45 +139,45 @@ static void store_int(struct value_entry *e, const char *val)
 
 static void store_float(struct value_entry *e, const char *val)
 {
-    e->types |= VALUE_FLOAT;
+    e->types |= B4VAL_FLOAT;
 
     e->f = strtod(val, NULL);
 }
 
-B4Values *b4_value_new(void)
+B4Values *b4val_new(void)
 {
     return calloc(1, sizeof(struct values));
 }
 
-void b4_value_store(B4Values *vals, const char *key, const char *val)
+void b4val_store(B4Values *vals, const char *key, const char *val)
 {
     if (!vals || !key || !val) return;
 
     struct value_entry e = {0};
     e.key = trim(xstrdup(key));
-    e.s = unquote(val);
+    e.s = unquote(val); // TODO: reimplement with chopping functions from b4se/str
 
-    if (b4_value_is_bool(e.s))  store_bool(&e, e.s);
-    if (b4_value_is_int(e.s))   store_int(&e, e.s);
-    if (b4_value_is_float(e.s)) store_float(&e, e.s);
+    if (b4val_is_bool(e.s))  store_bool(&e, e.s);
+    if (b4val_is_int(e.s))   store_int(&e, e.s);
+    if (b4val_is_float(e.s)) store_float(&e, e.s);
 
     push(vals, e);
 }
 
-void b4_value_dump(B4Values *vals)
+void b4val_dump(B4Values *vals)
 {
     for (int i = 0; i < vals->len; i++) {
         const struct value_entry e = vals->data[i];
         fprintf(stderr, "%s\n", e.key);
 
-        if (e.types & VALUE_BOOL)
-            fprintf(stderr, "├── as bool   : %s\n", b4_value_boolstr(e.b));
-        if (e.types & VALUE_INT)
+        if (e.types & B4VAL_BOOL)
+            fprintf(stderr, "├── as bool   : %s\n", b4val_boolstr(e.b));
+        if (e.types & B4VAL_INT)
             fprintf(stderr, "├── as int    : %ld\n", e.i);
-        if (e.types & VALUE_FLOAT) {
+        if (e.types & B4VAL_FLOAT) {
             fprintf(stderr, "├── as float  : %g", e.f);
 
-            if (e.types & VALUE_INT)
+            if (e.types & B4VAL_INT)
                 fprintf(stderr, ".0"); // FIXME: sloppy attempt that fails miserably
                                        //        when met with scientific notation
             fprintf(stderr, "\n");
@@ -186,55 +186,55 @@ void b4_value_dump(B4Values *vals)
     }
 }
 
-void b4_value_free(B4Values *vals)
+void b4val_free(B4Values *vals)
 {
     free(vals->data);
     free(vals);
 }
 
-const char *b4_value_error(B4ValueStatus err)
+const char *b4val_error(B4ValueStatus err)
 {
     switch (err) {
-    case VALUE_OK:             return "OPERATION OK";
-    case VALUE_NOT_FOUND:      return "KEY NOT FOUND";
-    case VALUE_BAD_CONVERSION: return "CONVERSION NOT POSSIBLE";
+    case B4VAL_OK:             return "OPERATION OK";
+    case B4VAL_NOT_FOUND:      return "KEY NOT FOUND";
+    case B4VAL_BAD_CONVERSION: return "CONVERSION NOT POSSIBLE";
     default:                   return "UNKNOWN ERROR";
     }
 }
 
-const char *b4_value_boolstr(bool expr)
+const char *b4val_boolstr(bool expr)
 {
     return expr ? "true" : "false";
 }
 
-char *b4_value_get_str(B4Values *vals, const char *key, B4ValueStatus *err)
+char *b4val_get_str(B4Values *vals, const char *key, B4ValueStatus *err)
 {
     struct value_entry *e = get(vals, key);
 
     if (!e) {
-        if (err) *err = VALUE_NOT_FOUND;
+        if (err) *err = B4VAL_NOT_FOUND;
         return NULL;
     }
 
-    if (err) *err = VALUE_OK;
+    if (err) *err = B4VAL_OK;
 
     return e->s;
 }
 
-bool b4_value_get_bool(B4Values *vals, const char *key, B4ValueStatus *err)
+bool b4val_get_bool(B4Values *vals, const char *key, B4ValueStatus *err)
 {
-    struct value_entry *e = get_as(vals, key, VALUE_BOOL, err);
+    struct value_entry *e = get_as(vals, key, B4VAL_BOOL, err);
     return e ? e->b : false;
 }
 
-int64_t b4_value_get_int(B4Values *vals, const char *key, B4ValueStatus *err)
+int64_t b4val_get_int(B4Values *vals, const char *key, B4ValueStatus *err)
 {
-    struct value_entry *e = get_as(vals, key, VALUE_INT, err);
+    struct value_entry *e = get_as(vals, key, B4VAL_INT, err);
     return e ? e->i : 0;
 }
 
-double b4_value_get_float(B4Values *vals, const char *key, B4ValueStatus *err)
+double b4val_get_float(B4Values *vals, const char *key, B4ValueStatus *err)
 {
-    struct value_entry *e = get_as(vals, key, VALUE_FLOAT, err);
+    struct value_entry *e = get_as(vals, key, B4VAL_FLOAT, err);
     return e ? e->f : 0.0;
 }
